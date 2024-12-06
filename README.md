@@ -1,6 +1,6 @@
 # dao-1
 
-## Git Commands
+## Git Command
 
 ```
 ssh-keygen -t ed25519 -C "just a comment"
