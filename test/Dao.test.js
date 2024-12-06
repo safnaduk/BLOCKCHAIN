@@ -57,7 +57,7 @@ describe("DAO Contract Testing Flow", function () {
         /* ------------ Assign Roles to Governer Contract -------------*/
         // Get Roles, GrantRole - TimeLock (only admin) 
 
-        // Get the role identifiers
+        // get the role identifiers
         const PROPOSER_ROLE = await TimeLock.PROPOSER_ROLE();
         const EXECUTOR_ROLE = await TimeLock.EXECUTOR_ROLE();
 
