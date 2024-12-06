@@ -1,6 +1,33 @@
-import { useState } from "react";
-import * as React from "react";
-import { id, Interface, Contract, BrowserProvider } from "ethers";
+import { useState, useEffect } from "react";
+import { ethers, BrowserProvider, Contract } from "ethers";
+import {
+  AppBar,
+  Box,
+  Toolbar,
+  Typography,
+  Button,
+  Container,
+  Grid,
+  Paper,
+  Card,
+  CardContent,
+  CardActions,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  IconButton,
+  Chip,
+  LinearProgress
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
 import {
   CertAddr,
@@ -9,368 +36,481 @@ import {
 import { abi as Govabi } from "./contract-data/MyGovernor.json";
 import { abi as Certabi } from "./contract-data/Cert.json";
 
-import AppBar from "@mui/material/AppBar";
-import Box from "@mui/material/Box";
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import IconButton from "@mui/material/IconButton";
-import MenuIcon from "@mui/icons-material/Menu";
-
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-
-import Card from "@mui/material/Card";
-import CardActions from "@mui/material/CardActions";
-import CardContent from "@mui/material/CardContent";
-
-import Chip from "@mui/material/Chip";
-
-import { experimentalStyled as styled } from "@mui/material/styles";
-import Paper from "@mui/material/Paper";
-import Grid from "@mui/material/Grid";
-
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-
 function App() {
-  const [loginState, setLoginState] = useState("Connect");
+  const [loginState, setLoginState] = useState("Connect Wallet");
   const [proposals, setProposals] = useState([
-    ['No Prosposals', '']
+    { 
+      id: 1, 
+      title: "Sample Proposal 1", 
+      description: "This is a sample proposal description", 
+      status: "Active",
+      votesFor: 100,
+      votesAgainst: 50,
+      deadline: "2024-02-01"
+    },
+    { 
+      id: 2, 
+      title: "Sample Proposal 2", 
+      description: "Another sample proposal description", 
+      status: "Pending",
+      votesFor: 75,
+      votesAgainst: 25,
+      deadline: "2024-02-05"
+    }
   ]);
-  const [pDescription, setPDescription] = useState('');
+  const [votingPower, setVotingPower] = useState(1000);
+  const [balance, setBalance] = useState(2000);
+  const [isAdmin, setIsAdmin] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [description, setDescription] = useState("");
+  const [contracts, setContracts] = useState({});
+  const [account, setAccount] = useState("");
 
-  const provider = new BrowserProvider(window.ethereum);
-  console.log("Provider:", provider);
+  // Enhanced theme configuration
+  const theme = {
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+    neonYellow: '#FFFF00',
+    neonYellowGlow: '0 0 10px #FFFF00, 0 0 20px #FFFF00, 0 0 30px #FFFF00',
+    neonPurple: '#b026ff',
+    neonPurpleGlow: '0 0 10px #b026ff, 0 0 20px #b026ff, 0 0 30px #b026ff',
+    cardBackground: 'rgba(20, 20, 20, 0.95)',
+    cardBackgroundHover: 'rgba(30, 30, 30, 0.95)',
+    textColor: '#FFFFFF',
+    gradientText: 'linear-gradient(45deg, #FFFF00, #b026ff)',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+    border: '1px solid rgba(255, 255, 255, 0.18)',
+    borderRadius: '10px'
+  };
 
-  const handleSubmit = async (event) => {
-    const signer = await provider.getSigner();
-    const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
-    const Certinstance = new Contract(CertAddr, Certabi, signer);
-
-    let paramsArray = [104, "An", "EDP", "A", "25th June"];
-
-    const transferCalldata = Certinstance.interface.encodeFunctionData(
-      "issue",
-      paramsArray
-    );
-
+  const connectWallet = async () => {
     try {
-      // Propose the transaction
-      const proposeTx = await Govinstance.propose(
-        [CertAddr],
-        [0],
-        [transferCalldata],
-        pDescription
-      );
-      await proposeTx.wait();
-      console.log("Proposal transaction successful:", proposeTx.hash);
-      getEvents();
-      handleClose();
-    } catch (error) {
-      console.error("Error proposing transaction:", error);
+      if (typeof window.ethereum !== 'undefined') {
+        // Request account access
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const account = accounts[0];
+        setLoginState("Connected: " + account.slice(0, 6) + "...");
+
+        // Create provider
+        const provider = new BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        
+        // Create contract instances
+        const governorContract = new Contract(MyGovernorAddr, Govabi, signer);
+        const certContract = new Contract(CertAddr, Certabi, signer);
+
+        // Store these in state for later use
+        setContracts({ governor: governorContract, cert: certContract });
+        setAccount(account);
+
+        // Load initial data
+        // await getEvents();
+      } else {
+        console.error("Please install MetaMask");
+        // setError("Please install MetaMask");
+      }
+    } catch (err) {
+      console.error("Error connecting wallet:", err);
+      // setError("Failed to connect wallet: " + err.message);
     }
   };
 
-  const getEvents = async (event) => {
-    let eventlogs = [];
-
-    const signer = await provider.getSigner();
-    const Govinstance = new Contract(MyGovernorAddr, Govabi, signer);
-
-    const filter = Govinstance.filters.ProposalCreated();
-    const events = await Govinstance.queryFilter(filter);
-    console.log("ProposalCreated events:", events);
-
-    events.forEach((event) => {
-      eventlogs.push([event.args[0].toString(), event.args[8]]);
-    });
-    setProposals(eventlogs);
-    console.log(eventlogs);
-  };
-
-  async function connectMetaMask() {
-    const signer = await provider.getSigner();
-    alert(`Successfully Connected ${signer.address}`);
-    setLoginState("Connected");
-  }
-
-  const [open, setOpen] = React.useState(false);
-
-  const handleClickOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  const handlePDesChange = (event) => {
-    setPDescription(event.target.value);
+  const handleCreateProposal = async () => {
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const govContract = new Contract(MyGovernorAddr, Govabi, signer);
+      
+      // This is a simplified example - adjust according to your needs
+      const tx = await govContract.propose(
+        [CertAddr],
+        [0],
+        ["0x"],
+        description
+      );
+      await tx.wait();
+      setOpen(false);
+      alert("Proposal created successfully!");
+    } catch (error) {
+      console.error("Error creating proposal:", error);
+      alert("Failed to create proposal");
+    }
   };
 
   return (
-    <>
-      <Box sx={{ flexGrow: 1 }}>
-        <AppBar position="static">
-          <Toolbar>
-            <IconButton
-              size="large"
-              edge="start"
-              color="inherit"
-              aria-label="menu"
-              sx={{ mr: 2 }}
-            >
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              DAO: Certi App
-            </Typography>
-            <Button color="inherit" onClick={connectMetaMask}>
-              <b>{loginState}</b>
-            </Button>
-          </Toolbar>
-        </AppBar>
-      </Box>
-      <br></br>
-      <Button variant="outlined" onClick={handleClickOpen}>
-        New Proposal
-      </Button>
-      <Button
-        style={{ marginLeft: "5px" }}
-        variant="outlined"
-        onClick={getEvents}
-      >
-        Events
-      </Button>
-      <h2>Active Proposals</h2>
-      <div
-        style={{
-          border: "2px solid blue",
-          padding: "10px",
-          borderRadius: "25px",
-          marginTop: "20px",
-          marginBottom: "20px",
-        }}
-      >
-        <Box sx={{ flexGrow: 1 }}>
-          <Grid
-            container
-            spacing={{ xs: 2, md: 3 }}
-            columns={{ xs: 4, sm: 8, md: 12 }}
+    <Box sx={{ 
+      minHeight: '100vh',
+      minWidth: '100vw',
+      background: theme.background,
+      color: theme.textColor,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      <AppBar position="static" sx={{ 
+        background: 'rgba(10, 10, 10, 0.9)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: theme.boxShadow,
+        width: '100%'
+      }}>
+        <Toolbar>
+          <Typography 
+            variant="h4" 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              fontWeight: 'bold',
+              background: theme.gradientText,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              textShadow: '0 0 10px rgba(255, 255, 0, 0.5)'
+            }}
           >
-            {proposals.map((proposal, index) => (
-              <Grid item xs={2} sm={4} md={4}>
-                <Card sx={{ minWidth: 275 }}>
-                  <CardContent>
-                    <Typography component="div" paragraph style={{ wordWrap: 'break-word' }}>
-                      <b>Proposal ID: </b>
-                      {proposal[0]}
+            DAO Governance
+          </Typography>
+          <Button 
+            variant="contained"
+            startIcon={<AccountBalanceWalletIcon />}
+            onClick={connectWallet}
+            sx={{ 
+              background: 'rgba(255, 255, 0, 0.1)',
+              backdropFilter: 'blur(5px)',
+              border: '1px solid rgba(255, 255, 0, 0.2)',
+              color: theme.neonYellow,
+              '&:hover': {
+                background: 'rgba(255, 255, 0, 0.2)',
+                boxShadow: theme.neonYellowGlow
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {loginState}
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      <Box sx={{ 
+        flex: 1,
+        width: '100%',
+        height: 'calc(100vh - 64px)', // Subtract AppBar height
+        overflow: 'auto',
+        py: 3,
+        px: { xs: 2, md: 4 }
+      }}>
+        <Grid container spacing={3} sx={{ height: '100%' }}>
+          {/* Stats Cards */}
+          <Grid item xs={12} md={3}>
+            <Paper sx={{ 
+              height: '100%',
+              p: 3,
+              background: theme.cardBackground,
+              backdropFilter: 'blur(16px)',
+              borderRadius: theme.borderRadius,
+              border: theme.border,
+              boxShadow: theme.boxShadow,
+              transition: 'transform 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-5px)',
+                boxShadow: theme.neonYellowGlow
+              }
+            }}>
+              <Typography variant="h5" sx={{ 
+                color: theme.neonYellow,
+                mb: 3,
+                fontWeight: 'bold'
+              }}>
+                Your Stats
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Paper sx={{ 
+                    p: 2, 
+                    background: 'rgba(255, 255, 0, 0.1)',
+                    borderRadius: theme.borderRadius
+                  }}>
+                    <Typography variant="overline" display="block" sx={{ color: theme.neonYellow }}>
+                      Token Balance
                     </Typography>
-
-                    <Typography variant="body2">{proposal[1]}</Typography>
-                  </CardContent>
-                  <CardActions>
-                    <Button variant="contained">Active</Button>
-                  </CardActions>
-                </Card>
+                    <Typography variant="h4" sx={{ color: theme.textColor }}>
+                      {balance}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ 
+                    p: 2, 
+                    background: 'rgba(176, 38, 255, 0.1)',
+                    borderRadius: theme.borderRadius
+                  }}>
+                    <Typography variant="overline" display="block" sx={{ color: theme.neonPurple }}>
+                      Voting Power
+                    </Typography>
+                    <Typography variant="h4" sx={{ color: theme.textColor }}>
+                      {votingPower}
+                    </Typography>
+                  </Paper>
+                </Grid>
               </Grid>
-            ))}
+            </Paper>
           </Grid>
-        </Box>
-      </div>
 
-      <h2>All Proposals</h2>
-      <div
-        style={{
-          border: "2px solid blue",
-          padding: "10px",
-          borderRadius: "25px",
-          marginTop: "20px",
-          marginBottom: "20px",
+          {/* Proposals Section */}
+          <Grid item xs={12} md={9}>
+            <Paper sx={{ 
+              height: '100%',
+              p: 3,
+              background: theme.cardBackground,
+              backdropFilter: 'blur(16px)',
+              borderRadius: theme.borderRadius,
+              border: theme.border,
+              boxShadow: theme.boxShadow,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                mb: 3 
+              }}>
+                <Typography variant="h5" sx={{ 
+                  color: theme.neonYellow,
+                  fontWeight: 'bold'
+                }}>
+                  Active Proposals
+                </Typography>
+                <Button 
+                  variant="contained"
+                  startIcon={<AddCircleOutlineIcon />}
+                  onClick={() => setOpen(true)}
+                  sx={{ 
+                    background: 'rgba(255, 255, 0, 0.1)',
+                    backdropFilter: 'blur(5px)',
+                    border: '1px solid rgba(255, 255, 0, 0.2)',
+                    color: theme.neonYellow,
+                    '&:hover': {
+                      background: 'rgba(255, 255, 0, 0.2)',
+                      boxShadow: theme.neonYellowGlow
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Create Proposal
+                </Button>
+              </Box>
+              
+              <Box sx={{ 
+                flex: 1,
+                overflow: 'auto',
+                pr: 2,
+                mr: -2, // Compensate for padding to align with header
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: theme.neonYellow,
+                  borderRadius: '4px',
+                  '&:hover': {
+                    background: theme.neonPurple,
+                  },
+                },
+              }}>
+                <Grid container spacing={2}>
+                  {proposals.map((proposal) => (
+                    <Grid item xs={12} key={proposal.id}>
+                      <Card sx={{ 
+                        background: theme.cardBackground,
+                        borderRadius: theme.borderRadius,
+                        border: theme.border,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateX(10px)',
+                          boxShadow: theme.neonPurpleGlow
+                        }
+                      }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h6" sx={{ color: theme.textColor }}>
+                              {proposal.title}
+                            </Typography>
+                            <Chip 
+                              label={proposal.status} 
+                              sx={{ 
+                                background: proposal.status === 'Active' ? 'rgba(255, 255, 0, 0.1)' : 'rgba(176, 38, 255, 0.1)',
+                                color: proposal.status === 'Active' ? theme.neonYellow : theme.neonPurple,
+                                border: `1px solid ${proposal.status === 'Active' ? theme.neonYellow : theme.neonPurple}`,
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
+                            {proposal.description}
+                          </Typography>
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="caption" sx={{ color: theme.neonYellow }}>
+                              Votes Progress
+                            </Typography>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={(proposal.votesFor / (proposal.votesFor + proposal.votesAgainst)) * 100}
+                              sx={{
+                                height: 8,
+                                borderRadius: 5,
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                '& .MuiLinearProgress-bar': {
+                                  background: `linear-gradient(45deg, ${theme.neonYellow}, ${theme.neonPurple})`
+                                }
+                              }}
+                            />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                              <Typography variant="caption" sx={{ color: theme.neonYellow }}>
+                                For: {proposal.votesFor}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: theme.neonPurple }}>
+                                Against: {proposal.votesAgainst}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                            Deadline: {proposal.deadline}
+                          </Typography>
+                        </CardContent>
+                        <CardActions sx={{ p: 2, pt: 0 }}>
+                          <Button 
+                            startIcon={<HowToVoteIcon />}
+                            sx={{ 
+                              color: theme.neonYellow,
+                              '&:hover': { color: theme.neonPurple }
+                            }}
+                          >
+                            Vote For
+                          </Button>
+                          <Button 
+                            startIcon={<HowToVoteIcon />}
+                            sx={{ 
+                              color: theme.neonYellow,
+                              '&:hover': { color: theme.neonPurple }
+                            }}
+                          >
+                            Vote Against
+                          </Button>
+                        </CardActions>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Create Proposal Dialog */}
+      <Dialog 
+        open={open} 
+        onClose={() => setOpen(false)}
+        PaperProps={{
+          style: {
+            background: theme.cardBackground,
+            backdropFilter: 'blur(16px)',
+            borderRadius: theme.borderRadius,
+            border: theme.border,
+          }
         }}
+        maxWidth="sm"
+        fullWidth
       >
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
+        <DialogTitle sx={{ 
+          color: theme.neonYellow,
+          borderBottom: '1px solid rgba(255, 255, 0, 0.1)'
+        }}>
+          Create New Proposal
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Proposal Title"
+            fullWidth
+            variant="outlined"
+            sx={{ 
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                color: theme.textColor,
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 0, 0.3)',
+                },
+                '&:hover fieldset': {
+                  borderColor: theme.neonYellow,
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: theme.neonYellow,
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: theme.neonYellow,
+              }
+            }}
+          />
+          <TextField
+            multiline
+            rows={4}
+            margin="dense"
+            label="Proposal Description"
+            fullWidth
+            variant="outlined"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                color: theme.textColor,
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 0, 0.3)',
+                },
+                '&:hover fieldset': {
+                  borderColor: theme.neonYellow,
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: theme.neonYellow,
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: theme.neonYellow,
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={() => setOpen(false)}
+            sx={{ 
+              color: 'rgba(255, 255, 255, 0.5)',
+              '&:hover': { color: theme.textColor }
+            }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #1: Issue certificate 101</Typography>
-          </AccordionDetails>
-        </Accordion>
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={handleCreateProposal}
+            sx={{ 
+              background: 'rgba(255, 255, 0, 0.1)',
+              color: theme.neonYellow,
+              border: '1px solid rgba(255, 255, 0, 0.3)',
+              '&:hover': {
+                background: 'rgba(255, 255, 0, 0.2)',
+                boxShadow: theme.neonYellowGlow
+              }
+            }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #2: Issue certificate 102</Typography>
-          </AccordionDetails>
-        </Accordion>
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #3: Issue certificate 104</Typography>
-          </AccordionDetails>
-        </Accordion>
-        <Accordion defaultExpanded>
-          <AccordionSummary
-            expandIcon={<ArrowDownwardIcon />}
-            aria-controls="panel1-content"
-            id="panel1-header"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                width: "90%",
-              }}
-            >
-              <Typography>
-                <b>Proposal ID: </b>
-                40113249118907347497846265566344225737199931284307161947685216366528597413334
-              </Typography>
-              <Chip label="Success" color="primary" />
-            </div>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>Proposal #4: Issue certificate 104</Typography>
-          </AccordionDetails>
-        </Accordion>
-      </div>
-      <React.Fragment>
-        <Dialog
-          open={open}
-          onClose={handleClose}
-          PaperProps={{
-            component: "form",
-            onSubmit: (event) => {
-              event.preventDefault();
-              const formData = new FormData(event.currentTarget);
-              const formJson = Object.fromEntries(formData.entries());
-              const email = formJson.email;
-              console.log(email);
-              handleClose();
-            },
-          }}
-        >
-          <DialogTitle>New Proposal</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Enter the details for a new proposal
-            </DialogContentText>
-            <br />
-            <Select
-              labelId="demo-simple-select-label"
-              id="demo-simple-select"
-              value="Function to Execute"
-              // onChange={handleChange}
-            >
-              <MenuItem value="Function to Execute">
-                Function to Execute
-              </MenuItem>
-              <MenuItem value="issue">issue</MenuItem>
-            </Select>
-            <TextField
-              autoFocus
-              required
-              margin="dense"
-              id="name"
-              name="email"
-              label="Details of the Function to Execute"
-              type="email"
-              fullWidth
-              variant="standard"
-            />
-            <TextField
-              autoFocus
-              required
-              margin="dense"
-              id="name"
-              name="email"
-              label="Address of the contract"
-              type="email"
-              fullWidth
-              variant="standard"
-            />
-            <TextField
-              autoFocus
-              required
-              margin="dense"
-              id="name"
-              name="email"
-              label="Description"
-              type="email"
-              fullWidth
-              variant="standard"
-              onChange={handlePDesChange}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleClose}>Cancel</Button>
-            <Button onClick={handleSubmit}>Submit</Button>
-          </DialogActions>
-        </Dialog>
-      </React.Fragment>
-    </>
+            Create Proposal
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
 
