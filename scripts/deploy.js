@@ -4,7 +4,7 @@ const fs = require("fs");
 
 
 async function main() {
-    // Get the deployer's account
+    // Get the deployer account
     const [deployer] = await ethers.getSigners();
 
     console.log(`Deploying contracts with the account: ${deployer.address}`);
